@@ -219,6 +219,22 @@
     font-weight: 700;
     color: var(--sub);
   }
+  .sharebtn {
+    flex: none;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--sub);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 99px;
+    padding: 4px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .sharebtn:active {
+    background: var(--line);
+  }
   .view {
     display: none;
   }
@@ -578,6 +594,10 @@
     <div class="progwrap" id="progwrap" hidden>
       <div class="track"><div class="fill" id="fill"></div></div>
       <span class="progtxt" id="progtxt">0 / 0</span>
+      <button class="sharebtn" id="share-out" type="button">
+        체크 내보내기
+      </button>
+      <button class="sharebtn" id="share-in" type="button">가져오기</button>
     </div>
   </div>
 </div>
@@ -796,6 +816,65 @@
         updateCounts();
       });
     });
+    /* ── 동행자와 체크 공유 ───────────────────────────────────────────
+       localStorage는 기기별이라 동행자끼리 체크가 안 보인다.
+       내보내기 = 체크 상태를 짧은 코드로 복사 · 가져오기 = 붙여넣어 합치기.
+       합치기는 합집합이다 — 둘 중 한 명이 체크했으면 완료로 본다. */
+    function encodeChecks() {
+      var on = Object.keys(saved).filter(function (k) {
+        return saved[k];
+      });
+      return btoa(unescape(encodeURIComponent(JSON.stringify(on))));
+    }
+    function mergeChecks(code) {
+      var on = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+      if (!Array.isArray(on)) throw new Error("형식이 아닙니다");
+      var added = 0;
+      on.forEach(function (k) {
+        if (!saved[k]) {
+          saved[k] = true;
+          added++;
+        }
+      });
+      boxes.forEach(function (b) {
+        if (saved[b.dataset.k]) b.checked = true;
+      });
+      try {
+        localStorage.setItem(KEY, JSON.stringify(saved));
+      } catch (e) {}
+      updateCounts();
+      return added;
+    }
+    var shareBtn = document.getElementById("share-out");
+    if (shareBtn)
+      shareBtn.addEventListener("click", function () {
+        var code = encodeChecks();
+        function done() {
+          shareBtn.textContent = "복사됨 · 동행자에게 보내세요";
+          setTimeout(function () {
+            shareBtn.textContent = "체크 내보내기";
+          }, 2500);
+        }
+        if (navigator.clipboard) navigator.clipboard.writeText(code).then(done);
+        else {
+          window.prompt("아래 코드를 복사해 동행자에게 보내세요", code);
+          done();
+        }
+      });
+    var importBtn = document.getElementById("share-in");
+    if (importBtn)
+      importBtn.addEventListener("click", function () {
+        var code = window.prompt("동행자에게 받은 코드를 붙여넣으세요");
+        if (!code) return;
+        try {
+          alert(mergeChecks(code) + "개를 합쳤습니다");
+        } catch (e) {
+          alert(
+            "코드를 읽지 못했습니다. 전체를 그대로 붙여넣었는지 확인하세요",
+          );
+        }
+      });
+
     var currentView = "plan";
     function updateProgress() {
       var c = document.getElementById("view-" + currentView);
