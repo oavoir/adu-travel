@@ -1,0 +1,886 @@
+<!-- 여행플래너 아티팩트 템플릿.
+     사용법: 이 구조·CSS·JS를 그대로 쓰고 [대괄호] 부분과 예시 블록만 여행 내용으로 교체.
+     · 날짜 카드(.day)는 일수만큼 복제, 색은 --c로 날마다 다르게
+     · 체크리스트 섹션(.sec + .list[data-group])은 필요한 만큼 복제
+     · ★ 체크 키(data-k)는 순번(f-1) 금지 — 반드시 내용 기반 슬러그로: f-ichiran-dotonbori, s-kabejin, r-passport
+       이유: localStorage 체크가 키에 붙는다. 재발행 때 항목이 추가·이동돼도 기존 키를 절대 바꾸지 말 것
+       (키가 바뀌면 사용자가 여행 중 체크한 게 유실/엉뚱한 항목에 붙음)
+     · 주소는 .addr 텍스트(탭=전체선택) + 🗺️ 지도 링크를 항상 병기 (텍스트=복사용, 링크=바로 열기)
+     · 예약·현장확인 필요한 곳은 전화번호를 .addr 안에 포함
+     · localStorage 키(KEY)는 여행마다 고유하게 바꿀 것
+     · 발행 후 사용자 안내 필수: ①동행자 공유하려면 share 켜기(기본 비공개) ②체크는 기기별 저장
+       ③출국 전 폰에서 한 번 열어두기(오프라인 대비) — 원하면 PDF 백업 제공
+
+     ⚠️ 이 파일을 미리보기 창(정적 스냅샷)으로 열면 자바스크립트가 안 돌아서
+        탭이 안 넘어가고 기본 탭(일정)만 보인다. 템플릿 버그가 아니다.
+        탭·체크·글자크기 토글을 실제로 확인하려면 아티팩트로 발행하거나
+        로컬 서버로 띄운다:  python3 -m http.server 8899   →  http://localhost:8899 -->
+<title>[도시명] [N]일 여행</title>
+<style>
+  :root {
+    --paper: #f4f2ec;
+    --card: #fffefb;
+    --ink: #1d2230;
+    --sub: #5c6377;
+    --faint: #8b91a2;
+    --line: #e3e0d7;
+    --line-strong: #d3cfc3;
+    --indigo: #2f3e6b;
+    --indigo-soft: #eef0f7;
+    --teal: #367685;
+    --persimmon: #bf5137;
+    --gold: #9a7328;
+    --accent: #bf5137;
+    --check: #367685;
+    --shadow:
+      0 1px 2px rgba(29, 34, 48, 0.04), 0 6px 20px rgba(29, 34, 48, 0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12141b;
+      --card: #1b1e28;
+      --ink: #e9eaf0;
+      --sub: #a2a8b8;
+      --faint: #6f7688;
+      --line: #2a2e3a;
+      --line-strong: #363b49;
+      --indigo: #8ea3dd;
+      --indigo-soft: #232838;
+      --teal: #6fb3c1;
+      --persimmon: #e07a5f;
+      --gold: #c6a15a;
+      --accent: #e07a5f;
+      --check: #6fb3c1;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #f4f2ec;
+    --card: #fffefb;
+    --ink: #1d2230;
+    --sub: #5c6377;
+    --faint: #8b91a2;
+    --line: #e3e0d7;
+    --line-strong: #d3cfc3;
+    --indigo: #2f3e6b;
+    --indigo-soft: #eef0f7;
+    --teal: #367685;
+    --persimmon: #bf5137;
+    --gold: #9a7328;
+    --accent: #bf5137;
+    --check: #367685;
+    --shadow:
+      0 1px 2px rgba(29, 34, 48, 0.04), 0 6px 20px rgba(29, 34, 48, 0.06);
+  }
+  :root[data-theme="dark"] {
+    --paper: #12141b;
+    --card: #1b1e28;
+    --ink: #e9eaf0;
+    --sub: #a2a8b8;
+    --faint: #6f7688;
+    --line: #2a2e3a;
+    --line-strong: #363b49;
+    --indigo: #8ea3dd;
+    --indigo-soft: #232838;
+    --teal: #6fb3c1;
+    --persimmon: #e07a5f;
+    --gold: #c6a15a;
+    --accent: #e07a5f;
+    --check: #6fb3c1;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family:
+      -apple-system, "Apple SD Gothic Neo", BlinkMacSystemFont, "Pretendard",
+      "Malgun Gothic", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+  }
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0 16px 64px;
+  }
+  .top {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter: saturate(1.4) blur(12px);
+    -webkit-backdrop-filter: saturate(1.4) blur(12px);
+    border-bottom: 1px solid var(--line);
+    margin: 0;
+    padding: 14px 16px 0;
+  }
+  .top-inner {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  .brandrow {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0;
+    letter-spacing: -0.02em;
+    font-weight: 800;
+  }
+  h1 .k {
+    color: var(--accent);
+  }
+  .dates {
+    font-size: 12.5px;
+    color: var(--sub);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .metastrip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    font-size: 12px;
+    color: var(--sub);
+    margin-top: 6px;
+  }
+  .metastrip b {
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .seg {
+    display: flex;
+    gap: 4px;
+    margin-top: 12px;
+    background: var(--indigo-soft);
+    padding: 4px;
+    border-radius: 12px;
+  }
+  .seg button {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--sub);
+    font: inherit;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 9px 3px;
+    border-radius: 9px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      background 0.18s,
+      color 0.18s,
+      box-shadow 0.18s;
+  }
+  .seg button[aria-selected="true"] {
+    background: var(--card);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+  }
+  .seg button:focus-visible {
+    outline: 2px solid var(--indigo);
+    outline-offset: 2px;
+  }
+  .progwrap {
+    margin: 10px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .progwrap[hidden] {
+    display: none;
+  } /* [hidden]이 display:flex에 지므로 명시 필요 */
+  .track {
+    flex: 1;
+    height: 7px;
+    background: var(--line);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--teal), var(--accent));
+    border-radius: 99px;
+    transition: width 0.35s ease;
+  }
+  .progtxt {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--sub);
+  }
+  .view {
+    display: none;
+  }
+  .view.active {
+    display: block;
+    animation: fade 0.25s ease;
+  }
+  @keyframes fade {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .day {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    margin-top: 14px;
+    overflow: hidden;
+  }
+  .day-h {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .daytag {
+    --c: var(--indigo);
+    flex: none;
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    display: grid;
+    place-content: center;
+    background: color-mix(in srgb, var(--c) 14%, transparent);
+    color: var(--c);
+    font-weight: 800;
+    line-height: 1;
+    text-align: center;
+  }
+  .daytag .dow {
+    font-size: 15px;
+  }
+  .daytag .dt {
+    font-size: 10px;
+    font-weight: 700;
+    margin-top: 3px;
+    opacity: 0.8;
+  }
+  .day-h .title {
+    font-weight: 800;
+    font-size: 15.5px;
+    letter-spacing: -0.01em;
+  }
+  .day-h .sub {
+    font-size: 12px;
+    color: var(--sub);
+    margin-top: 2px;
+  }
+  .pill {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 1.5px 7px;
+    border-radius: 99px;
+    margin-left: 6px;
+    vertical-align: 1.5px;
+    background: color-mix(in srgb, var(--accent) 13%, transparent);
+    color: var(--accent);
+  }
+  .day-intro {
+    padding: 12px 16px 0;
+    font-size: 13px;
+    color: var(--sub);
+    line-height: 1.5;
+  }
+  .day-intro b {
+    color: var(--ink);
+    font-weight: 700;
+  }
+  .rows {
+    padding: 6px 16px 12px;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 52px 1fr;
+    gap: 12px;
+    padding: 9px 0;
+    border-top: 1px solid var(--line);
+  }
+  .rows .row:first-child {
+    border-top: 0;
+  }
+  .time {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--accent);
+    padding-top: 1px;
+  }
+  .act {
+    font-size: 14px;
+  }
+  .act .note {
+    display: block;
+    font-size: 12px;
+    color: var(--sub);
+    margin-top: 2px;
+  }
+  .addr {
+    display: block;
+    margin-top: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--teal);
+    -webkit-user-select: all;
+    user-select: all;
+  }
+  .addr .en {
+    color: var(--sub);
+    font-weight: 500;
+  }
+  .map {
+    display: inline-block;
+    margin-top: 4px;
+    margin-right: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--teal);
+    text-decoration: none;
+    border: 1px solid color-mix(in srgb, var(--teal) 38%, transparent);
+    padding: 2px 8px;
+    border-radius: 7px;
+  }
+  .map:focus-visible {
+    outline: 2px solid var(--teal);
+    outline-offset: 2px;
+  }
+  .fontbtn {
+    border: 1px solid var(--line-strong);
+    background: var(--card);
+    color: var(--sub);
+    font-weight: 800;
+    font-size: 12px;
+    border-radius: 8px;
+    padding: 3px 8px;
+    cursor: pointer;
+  }
+  :root[data-big] body {
+    zoom: 1.18;
+  } /* 어르신 가독성: 가A 토글 */
+  .sec {
+    margin-top: 18px;
+  }
+  .sec-h {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin: 0 4px 8px;
+  }
+  .sec-h h2 {
+    font-size: 15px;
+    margin: 0;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+  .sec-h .cnt {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--faint);
+  }
+  .list {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 13px 15px;
+    border-top: 1px solid var(--line);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .list .item:first-child {
+    border-top: 0;
+  }
+  .item input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .box {
+    flex: none;
+    width: 21px;
+    height: 21px;
+    border-radius: 7px;
+    border: 2px solid var(--line-strong);
+    margin-top: 1px;
+    display: grid;
+    place-content: center;
+    transition:
+      background 0.16s,
+      border-color 0.16s;
+  }
+  .box svg {
+    width: 12px;
+    height: 12px;
+    stroke: #fff;
+    stroke-width: 3.2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 20;
+    stroke-dashoffset: 20;
+    transition: stroke-dashoffset 0.2s ease;
+  }
+  .item input:checked ~ .box {
+    background: var(--check);
+    border-color: var(--check);
+  }
+  .item input:checked ~ .box svg {
+    stroke-dashoffset: 0;
+  }
+  .item input:focus-visible ~ .box {
+    outline: 2px solid var(--indigo);
+    outline-offset: 2px;
+  }
+  .txt {
+    flex: 1;
+    min-width: 0;
+  }
+  .name {
+    font-size: 14.5px;
+    font-weight: 600;
+    transition: color 0.16s;
+  }
+  .name .en {
+    font-size: 12px;
+    color: var(--sub);
+    font-weight: 500;
+  }
+  .desc {
+    font-size: 12px;
+    color: var(--sub);
+    margin-top: 2px;
+  }
+  .item input:checked ~ .txt .name {
+    color: var(--faint);
+    text-decoration: line-through;
+  }
+  .item input:checked ~ .txt .desc {
+    color: var(--faint);
+  }
+  .tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 5px;
+    margin-left: 6px;
+    letter-spacing: 0.02em;
+    vertical-align: 1px;
+  }
+  .tag.cash {
+    background: color-mix(in srgb, var(--gold) 16%, transparent);
+    color: var(--gold);
+  }
+  .tag.hot {
+    background: color-mix(in srgb, var(--persimmon) 15%, transparent);
+    color: var(--persimmon);
+  }
+  .phrase {
+    padding: 12px 15px;
+    border-top: 1px solid var(--line);
+  }
+  .list .phrase:first-child {
+    border-top: 0;
+  }
+  .phrase .ko {
+    font-size: 12px;
+    color: var(--sub);
+    font-weight: 600;
+  }
+  .phrase .jp {
+    font-size: 16px;
+    font-weight: 700;
+    margin-top: 3px;
+    letter-spacing: -0.01em;
+    line-height: 1.35;
+  }
+  .phrase .yomi {
+    font-size: 13px;
+    color: var(--accent);
+    margin-top: 2px;
+    font-weight: 600;
+  }
+  .note-card {
+    background: var(--indigo-soft);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 13px 15px;
+    margin-top: 14px;
+    font-size: 12.5px;
+    color: var(--sub);
+  }
+  .note-card b {
+    color: var(--ink);
+    font-weight: 700;
+  }
+  .foot {
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--faint);
+    margin-top: 26px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+</style>
+
+<div class="top">
+  <div class="top-inner">
+    <div class="brandrow">
+      <h1>[도시명] <span class="k">[N]일</span></h1>
+      <span style="display: flex; align-items: center; gap: 8px"
+        ><button class="fontbtn" id="fontbtn" title="글자 크게">가A</button
+        ><span class="dates">[M.D 요일 – M.D 요일]</span></span
+      >
+    </div>
+    <div class="metastrip">
+      <span>👤 <b>[인원]</b></span
+      ><span>🏨 <b>[숙소명]</b></span
+      ><span>🚗 <b>[렌터카/교통]</b> [예약번호]</span>
+    </div>
+    <div class="seg" role="tablist">
+      <button role="tab" aria-selected="true" data-view="plan">📅 일정</button>
+      <button role="tab" aria-selected="false" data-view="prep">🧳 준비</button>
+      <button role="tab" aria-selected="false" data-view="food">🍽️ 식당</button>
+      <button role="tab" aria-selected="false" data-view="shop">🛍️ 쇼핑</button>
+      <button role="tab" aria-selected="false" data-view="phrase">
+        🗣️ 회화
+      </button>
+    </div>
+    <div class="progwrap" id="progwrap" hidden>
+      <div class="track"><div class="fill" id="fill"></div></div>
+      <span class="progtxt" id="progtxt">0 / 0</span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <!-- 일정 탭: .day 카드를 일수만큼. --c 색은 날마다(indigo/teal/persimmon/gold 순환) -->
+  <div class="view active" id="view-plan">
+    <div class="day">
+      <div class="day-h">
+        <div class="daytag" style="--c: var(--indigo)">
+          <div>
+            <span class="dow">[요일]</span>
+            <div class="dt">[M/D]</div>
+          </div>
+        </div>
+        <div>
+          <div class="title">
+            [그날 테마] <span class="pill">[강조 태그(선택)]</span>
+          </div>
+          <div class="sub">[핵심 스팟 나열]</div>
+        </div>
+      </div>
+      <div class="day-intro">
+        🛬 <b>[한 줄 요약 제목.]</b> [오늘 뭐 하는 날인지 2문장 내 설명 — 순서와
+        이유가 드러나게]
+      </div>
+      <div class="rows">
+        <div class="row">
+          <div class="time">[09:30]</div>
+          <div class="act">
+            [활동]<span class="note">[메모: 주의·팁·⚠️기간한정 등]</span
+            ><span class="addr"
+              >📍 [현지어 주소]
+              <span class="en">([전화 +81-XX-XXXX-XXXX · 부가정보])</span></span
+            ><a
+              class="map"
+              href="https://www.google.com/maps/search/?api=1&query=[현지어+장소명]"
+              target="_blank"
+              rel="noopener"
+              >🗺️ 지도</a
+            >
+          </div>
+        </div>
+        <div class="row">
+          <div class="time">[시간]</div>
+          <div class="act">[활동]</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 일정 탭 맨 아래: 예산 요약 (조사된 고정비 합산 — 합계 계산은 코드로) -->
+    <div class="note-card">
+      💰 <b>고정비 요약:</b> 렌터카 [¥], 숙소 주차 [N박 ¥], 톨비 대략 [¥],
+      입장·티켓 [¥] → <b>합계 대략 [¥ (원화 환산)]</b>. 별도: 식비·주유·쇼핑.
+    </div>
+  </div>
+
+  <!-- 준비 탭: 출발 전 D-day 역산. ★ "D-30" 말고 실제 날짜로 쓸 것.
+       시점별 .sec 하나씩. 여행 성격에 맞게 항목을 재구성 (렌터카 없으면 국제면허 줄 삭제 등).
+       예약 오픈일이 정해진 명소(안네프랑크 등)는 반드시 여기에 날짜로 박는다 -->
+  <div class="view" id="view-prep">
+    <div class="note-card">
+      🛂 <b>제일 급한 것:</b> [여권 만료일 확인 결과 / 비자 필요 여부 / 가장
+      먼저 해야 할 한 가지]
+    </div>
+
+    <div class="sec">
+      <div class="sec-h">
+        <h2>📌 [M월 D일]까지 <span class="pill">D-[N]</span></h2>
+        <span class="cnt" data-cnt="prep-a"></span>
+      </div>
+      <div class="list" data-group="prep-a">
+        <label class="item"
+          ><input type="checkbox" data-k="p-passport-expiry" /><span class="box"
+            ><svg viewBox="0 0 14 14">
+              <path d="M2 7.5 L6 11 L12 3" /></svg></span
+          ><span class="txt"
+            ><span class="name"
+              >[할 일] <span class="tag hot">[필수/권장]</span></span
+            ><span class="desc"
+              >[왜 필요한지 한 줄 · 소요 시간 · 신청 링크]</span
+            ></span
+          ></label
+        >
+      </div>
+    </div>
+
+    <!-- 준비물: 여행 조건에 맞게. 렌터카면 면허 서류, 현금전용 많으면 현금 등 -->
+    <div class="sec">
+      <div class="sec-h">
+        <h2>🎒 챙길 것</h2>
+        <span class="cnt" data-cnt="prep-pack"></span>
+      </div>
+      <div class="list" data-group="prep-pack">
+        <label class="item"
+          ><input type="checkbox" data-k="r-passport" /><span class="box"
+            ><svg viewBox="0 0 14 14">
+              <path d="M2 7.5 L6 11 L12 3" /></svg></span
+          ><span class="txt"
+            ><span class="name"
+              >[여권 <span class="tag hot">필수</span> / 국제면허+원본면허 /
+              보험증서 / 어댑터 / 상비약 / eSIM / 현금 …]</span
+            ><span class="desc">[여행 조건에 맞게]</span></span
+          ></label
+        >
+      </div>
+    </div>
+  </div>
+
+  <!-- 식당 탭: 지역별 .sec 반복. ★ data-k는 내용 슬러그(f-가게명-지역) — 재발행 시 절대 안 바뀜 -->
+  <div class="view" id="view-food">
+    <div class="sec">
+      <div class="sec-h">
+        <h2>🍽️ [지역명]</h2>
+        <span class="cnt" data-cnt="food-a"></span>
+      </div>
+      <div class="list" data-group="food-a">
+        <label class="item"
+          ><input type="checkbox" data-k="f-ichiran-dotonbori" /><span
+            class="box"
+            ><svg viewBox="0 0 14 14">
+              <path d="M2 7.5 L6 11 L12 3" /></svg></span
+          ><span class="txt"
+            ><span class="name"
+              >[가게명] <span class="tag hot">[추천/배정끼니]</span></span
+            ><span class="desc"
+              >[메뉴 · 위치·역 · 가격 · ☎[전화] · 예약/현금/휴무]</span
+            ></span
+          ></label
+        >
+      </div>
+    </div>
+    <div class="note-card">
+      🍽️ [끼니 배정 요약: 목=A/B · 금=C/D … 나머진 골라먹는 후보.] · 체크는
+      폰마다 별개 저장 — 동행자와는 역할 분담 추천.
+    </div>
+  </div>
+
+  <!-- 쇼핑 탭: 장소/코스/브랜드(지역별)/살 거(카테고리별)/면세 순.
+       ※ 준비물은 준비 탭으로 옮겼다 — 여기에 중복해서 넣지 말 것 -->
+  <div class="view" id="view-shop">
+    <div class="sec">
+      <div class="sec-h">
+        <h2>🛍️ [섹션명]</h2>
+        <span class="cnt" data-cnt="shop-a"></span>
+      </div>
+      <div class="list" data-group="shop-a">
+        <label class="item"
+          ><input type="checkbox" data-k="s-kabejin" /><span class="box"
+            ><svg viewBox="0 0 14 14">
+              <path d="M2 7.5 L6 11 L12 3" /></svg></span
+          ><span class="txt"
+            ><span class="name"
+              >[품목/매장명] <span class="en">[현지어 표기]</span></span
+            ><span class="desc"
+              >[생김새·패키지 설명 · 어디서 사는지]</span
+            ></span
+          ></label
+        >
+      </div>
+      <div class="note-card">💡 [구매처 안내: 어느 지역·매장이 편한지]</div>
+    </div>
+  </div>
+
+  <!-- 회화 탭: 상황별 .sec (교통/숙소/식당/쇼핑/편의점/긴급/만능) + 🚨 긴급 정보(필수).
+       ★ 예약 전화가 필요한 식당이 있으면 "예약 전화" 섹션을 따로 두고
+         날짜·시간·인원·이름을 채운 완성 문장으로 넣는다 (일반 회화와 섞지 말 것) -->
+  <div class="view" id="view-phrase">
+    <div class="sec">
+      <div class="sec-h"><h2>🍽️ [상황명]</h2></div>
+      <div class="list">
+        <div class="phrase">
+          <div class="ko">[한국어 뜻]</div>
+          <div class="jp">[현지어 문장]</div>
+          <div class="yomi">[한글 발음]</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 긴급 정보: 나라에 맞게 채움. 문장이 아니라 "정보" — 번호·연락처·행동요령 -->
+    <div class="sec">
+      <div class="sec-h"><h2>🚨 긴급 정보</h2></div>
+      <div class="note-card">
+        · 경찰 [110] / 구급·화재 [119] (일본 기준 — 나라별 수정)<br />
+        · <b>영사콜센터(24h)</b> +82-2-3210-0404 · 현지 한국영사관 [번호]<br />
+        · 여행자보험: [보험사·증권번호·청구 시 진단서/영수증 챙기기]<br />
+        · 병원 찾기: 구글맵 "[病院/hospital]" + 호텔 프런트에 도움 요청<br />
+        · 여권 분실: 영사관에 여권용 사진+신분증 사본 (사본 미리 폰에 저장)
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">[도시명] [N]일 · 여행 중 폰으로 보는 용</div>
+</div>
+
+<script>
+  (function () {
+    var KEY = "trip_checks_[여행고유키]_v1"; // 여행마다 고유하게!
+    var TABKEY = "trip_tab_[여행고유키]_v1";
+    var saved = {};
+    try {
+      saved = JSON.parse(localStorage.getItem(KEY)) || {};
+    } catch (e) {
+      saved = {};
+    }
+    var boxes = Array.prototype.slice.call(
+      document.querySelectorAll(".item input[type=checkbox]"),
+    );
+    boxes.forEach(function (b) {
+      if (saved[b.dataset.k]) b.checked = true;
+      b.addEventListener("change", function () {
+        saved[b.dataset.k] = b.checked;
+        try {
+          localStorage.setItem(KEY, JSON.stringify(saved));
+        } catch (e) {}
+        updateCounts();
+      });
+    });
+    var currentView = "plan";
+    function updateProgress() {
+      var c = document.getElementById("view-" + currentView);
+      var arr = c
+        ? Array.prototype.slice.call(c.querySelectorAll("input[type=checkbox]"))
+        : [];
+      var done = arr.filter(function (i) {
+        return i.checked;
+      }).length;
+      document.getElementById("fill").style.width = arr.length
+        ? (done / arr.length) * 100 + "%"
+        : "0%";
+      document.getElementById("progtxt").textContent =
+        done + " / " + arr.length;
+    }
+    function updateCounts() {
+      updateProgress();
+      document.querySelectorAll(".list[data-group]").forEach(function (g) {
+        var arr = Array.prototype.slice.call(g.querySelectorAll("input"));
+        var d = arr.filter(function (i) {
+          return i.checked;
+        }).length;
+        var badge = document.querySelector(
+          '.cnt[data-cnt="' + g.dataset.group + '"]',
+        );
+        if (badge) badge.textContent = d + "/" + arr.length;
+      });
+    }
+    var tabs = Array.prototype.slice.call(
+      document.querySelectorAll(".seg button"),
+    );
+    var progwrap = document.getElementById("progwrap");
+    function selectTab(view) {
+      currentView = view;
+      tabs.forEach(function (t) {
+        t.setAttribute("aria-selected", String(t.dataset.view === view));
+      });
+      ["plan", "prep", "food", "shop", "phrase"].forEach(function (v) {
+        var el = document.getElementById("view-" + v);
+        if (el) el.classList.toggle("active", v === view);
+      });
+      progwrap.hidden = !(
+        view === "prep" ||
+        view === "food" ||
+        view === "shop"
+      );
+      updateProgress();
+      try {
+        localStorage.setItem(TABKEY, view);
+      } catch (e) {}
+      window.scrollTo({ top: 0 });
+    }
+    tabs.forEach(function (t) {
+      t.addEventListener("click", function () {
+        selectTab(t.dataset.view);
+      });
+    });
+    var startTab = "plan";
+    try {
+      startTab = localStorage.getItem(TABKEY) || "plan";
+    } catch (e) {}
+    selectTab(startTab);
+    updateCounts();
+    // 글자 크게 토글 (어르신 가독성) — 상태 저장
+    var FKEY = KEY + "_bigfont";
+    var fbtn = document.getElementById("fontbtn");
+    function applyFont(big) {
+      document.documentElement.toggleAttribute("data-big", big);
+      if (fbtn)
+        fbtn.style.background = big
+          ? "color-mix(in srgb, var(--teal) 18%, transparent)"
+          : "";
+    }
+    var big = false;
+    try {
+      big = localStorage.getItem(FKEY) === "1";
+    } catch (e) {}
+    applyFont(big);
+    if (fbtn)
+      fbtn.addEventListener("click", function () {
+        big = !big;
+        applyFont(big);
+        try {
+          localStorage.setItem(FKEY, big ? "1" : "0");
+        } catch (e) {}
+      });
+  })();
+</script>
