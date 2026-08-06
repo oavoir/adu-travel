@@ -14,7 +14,12 @@
      ⚠️ 이 파일을 미리보기 창(정적 스냅샷)으로 열면 자바스크립트가 안 돌아서
         탭이 안 넘어가고 기본 탭(일정)만 보인다. 템플릿 버그가 아니다.
         탭·체크·글자크기 토글을 실제로 확인하려면 아티팩트로 발행하거나
-        로컬 서버로 띄운다:  python3 -m http.server 8899   →  http://localhost:8899 -->
+        로컬 서버로 띄운다:  python3 -m http.server 8899   →  http://localhost:8899
+        (아래 charset·viewport 두 줄이 있어야 그 검수가 유효하다. 없으면 로컬 서버에서
+         한글이 windows-1252로 깨지고 폰에서 980px로 렌더된다. 아티팩트 발행 경로는
+         스켈레톤이 채워주지만 로컬 검수·PDF 백업·파일 공유 경로는 안 채워준다.) -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>[도시명] [N]일 여행</title>
 <style>
   :root {
@@ -234,6 +239,33 @@
   }
   .sharebtn:active {
     background: var(--line);
+  }
+  .sharebox {
+    margin: 0 0 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+  }
+  .sharebox[hidden] {
+    display: none;
+  }
+  .sharemsg {
+    font-size: 12px;
+    color: var(--sub);
+  }
+  #share-ta {
+    width: 100%;
+    font: inherit;
+    font-size: 12px;
+    line-height: 1.4;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
+    color: inherit;
+    resize: vertical;
+    word-break: break-all;
   }
   .view {
     display: none;
@@ -599,6 +631,18 @@
       </button>
       <button class="sharebtn" id="share-in" type="button">가져오기</button>
     </div>
+    <div class="sharebox" id="share-box" hidden>
+      <div class="sharemsg" id="share-msg"></div>
+      <textarea
+        id="share-ta"
+        rows="2"
+        spellcheck="false"
+        autocapitalize="off"
+      ></textarea>
+      <button class="sharebtn" id="share-apply" type="button" hidden>
+        합치기
+      </button>
+    </div>
   </div>
 </div>
 
@@ -845,33 +889,70 @@
       updateCounts();
       return added;
     }
+    /* 폴백은 페이지 안 요소로 한다. window.prompt/alert는 sandbox 프레임에서
+       allow-modals가 없으면 조용히 null을 반환하고, navigator.clipboard는
+       객체가 있어도 권한 거부로 reject된다. 둘 다 무음 실패라 최악이다. */
     var shareBtn = document.getElementById("share-out");
+    var shareBox = document.getElementById("share-box");
+    var shareTa = document.getElementById("share-ta");
+    var shareMsg = document.getElementById("share-msg");
+    var shareApply = document.getElementById("share-apply");
+    function openBox(value, msg, showApply) {
+      shareBox.hidden = false;
+      shareTa.value = value || "";
+      shareMsg.textContent = msg;
+      shareApply.hidden = !showApply;
+      shareTa.focus();
+      if (value) shareTa.select();
+    }
     if (shareBtn)
       shareBtn.addEventListener("click", function () {
         var code = encodeChecks();
-        function done() {
-          shareBtn.textContent = "복사됨 · 동행자에게 보내세요";
+        function flash(t) {
+          shareBtn.textContent = t;
           setTimeout(function () {
             shareBtn.textContent = "체크 내보내기";
           }, 2500);
         }
-        if (navigator.clipboard) navigator.clipboard.writeText(code).then(done);
-        else {
-          window.prompt("아래 코드를 복사해 동행자에게 보내세요", code);
-          done();
+        function fallback() {
+          openBox(code, "이 코드를 복사해 동행자에게 보내세요", false);
+          flash("코드 표시됨");
         }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard
+            .writeText(code)
+            .then(function () {
+              flash("복사됨 · 동행자에게 보내세요");
+              openBox(
+                code,
+                "복사했습니다. 안 됐으면 아래에서 직접 복사하세요",
+                false,
+              );
+            })
+            .catch(fallback);
+        } else fallback();
       });
     var importBtn = document.getElementById("share-in");
     if (importBtn)
       importBtn.addEventListener("click", function () {
-        var code = window.prompt("동행자에게 받은 코드를 붙여넣으세요");
-        if (!code) return;
+        openBox(
+          "",
+          "동행자에게 받은 코드를 여기 붙여넣고 합치기를 누르세요",
+          true,
+        );
+      });
+    if (shareApply)
+      shareApply.addEventListener("click", function () {
+        var code = shareTa.value;
+        if (!code.trim()) {
+          shareMsg.textContent = "코드가 비어 있습니다";
+          return;
+        }
         try {
-          alert(mergeChecks(code) + "개를 합쳤습니다");
+          shareMsg.textContent = mergeChecks(code) + "개를 합쳤습니다";
         } catch (e) {
-          alert(
-            "코드를 읽지 못했습니다. 전체를 그대로 붙여넣었는지 확인하세요",
-          );
+          shareMsg.textContent =
+            "코드를 읽지 못했습니다. 전체를 그대로 붙여넣었는지 확인하세요";
         }
       });
 
