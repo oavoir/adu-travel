@@ -559,6 +559,7 @@
     min-width: 0;
   }
   .name {
+    display: block; /* span이라 block을 안 주면 desc와 한 줄로 붙는다 */
     font-size: 14.5px;
     font-weight: 600;
     transition: color 0.16s;
@@ -569,6 +570,7 @@
     font-weight: 500;
   }
   .desc {
+    display: block;
     font-size: 12px;
     color: var(--sub);
     margin-top: 2px;
