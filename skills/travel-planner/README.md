@@ -135,7 +135,7 @@
 `.claude/skills/` 폴더에 `여행플래너` 폴더를 통째로 넣으면 끝입니다. 이후 여행 얘기를 하면 자동으로 작동합니다.
 
 ```
-.claude/skills/여행플래너/
+.claude/skills/travel-planner/
 ├── SKILL.md
 ├── references/
 │   ├── 여행상담.md          누구와 가는지 물어서 무엇을 찾을지 정하기
